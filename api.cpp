@@ -14,38 +14,69 @@
 
 using namespace vnr;
 
-void vnrLoadJsonText(vnrJson& output, std::string filename)
+void vnrLoadJsonText(vnrJson &output, const std::string &filename)
 {
   std::ifstream file(filename);
-  output = vnr::json::parse(file, nullptr, true, true);
-}
-
-void vnrLoadJsonBinary(vnrJson& output, std::string filename)
-{
-  std::ifstream file(filename, std::ios::binary | std::ios::ate);
-  std::streamsize size = file.tellg();
-  file.seekg(0, std::ios::beg);
-  std::vector<char> buffer(size);
-  if (file.read(buffer.data(), size)) {
-    output = vnr::json::from_bson(buffer);
+  if (!file.is_open())
+  {
+    throw std::runtime_error("vnrLoadJsonText: Failed to open file: " + filename);
+  }
+  try
+  {
+    file >> output;
+  }
+  catch (const std::exception &e)
+  {
+    throw std::runtime_error("vnrLoadJsonText: Error parsing JSON from file " + filename + ": " + e.what());
   }
 }
 
-void vnrSaveJsonText(const vnrJson& root, std::string filename)
+void vnrLoadJsonBinary(vnrJson &output, const std::string &filename)
+{
+  // Open the file in binary mode and move to the end to get the file size.
+  std::ifstream file(filename, std::ios::binary | std::ios::ate);
+  if (!file.is_open())
+  {
+    throw std::runtime_error("vnrLoadJsonBinary: Failed to open file: " + filename);
+  }
+
+  std::streamsize size = file.tellg();
+  if (size <= 0)
+  {
+    throw std::runtime_error("vnrLoadJsonBinary: File is empty or size is invalid: " + filename);
+  }
+
+  file.seekg(0, std::ios::beg);
+  std::vector<char> buffer(static_cast<size_t>(size));
+  if (!file.read(buffer.data(), size))
+  {
+    throw std::runtime_error("vnrLoadJsonBinary: Error reading file: " + filename);
+  }
+
+  try
+  {
+    output = vnr::json::from_bson(buffer);
+  }
+  catch (const std::exception &e)
+  {
+    throw std::runtime_error("vnrLoadJsonBinary: Error parsing BSON from file " + filename + ": " + e.what());
+  }
+}
+
+void vnrSaveJsonText(const vnrJson &root, std::string filename)
 {
   std::ofstream ofs(filename, std::ios::out);
   ofs << std::setw(4) << root << std::endl;
   ofs.close();
 }
 
-void vnrSaveJsonBinary(const vnrJson& root, std::string filename)
+void vnrSaveJsonBinary(const vnrJson &root, std::string filename)
 {
   const auto broot = json::to_bson(root);
   std::ofstream ofs(filename, std::ios::binary | std::ios::out);
-  ofs.write((char*)broot.data(), broot.size());
+  ofs.write((char *)broot.data(), broot.size());
   ofs.close();
 }
-
 
 vnrJson vnrCreateJsonText(std::string filename)
 {
@@ -61,7 +92,6 @@ vnrJson vnrCreateJsonBinary(std::string filename)
   return output;
 }
 
-
 // ------------------------------------------------------------------
 //
 // ------------------------------------------------------------------
@@ -71,13 +101,15 @@ vnrCamera vnrCreateCamera()
   return std::make_shared<Camera>();
 }
 
-vnrCamera vnrCreateCamera(const vnrJson& scene)
+vnrCamera vnrCreateCamera(const vnrJson &scene)
 {
   auto cam = std::make_shared<Camera>();
-  if (scene.is_string()) {
+  if (scene.is_string())
+  {
     create_json_camera(scene.get<std::string>(), *cam);
   }
-  else {
+  else
+  {
     create_json_camera_stringify(scene, *cam);
   }
   return cam;
@@ -85,20 +117,21 @@ vnrCamera vnrCreateCamera(const vnrJson& scene)
 
 void vnrCameraSet(vnrCamera self, vnr::vec3f from, vnr::vec3f at, vnr::vec3f up)
 {
-  *self = { 
-    /*from*/ from,
-    /* at */ at,
-    /* up */ up 
-  };
+  *self = {
+      /*from*/ from,
+      /* at */ at,
+      /* up */ up};
 }
 
-void vnrCameraSet(vnrCamera self, const vnrJson& scene)
+void vnrCameraSet(vnrCamera self, const vnrJson &scene)
 {
   // auto cam = std::make_shared<Camera>();
-  if (scene.is_string()) {
+  if (scene.is_string())
+  {
     create_json_camera(scene.get<std::string>(), *self);
   }
-  else {
+  else
+  {
     create_json_camera_stringify(scene, *self);
   }
 }
@@ -122,19 +155,21 @@ vnr::vec3f vnrCameraGetUpVec(vnrCamera self)
 //
 // ------------------------------------------------------------------
 
-inline std::shared_ptr<SimpleVolumeContext> 
-castSimpleVolume(vnrVolume self) 
+inline std::shared_ptr<SimpleVolumeContext>
+castSimpleVolume(vnrVolume self)
 {
-  if (self->isNetwork()) {
+  if (self->isNetwork())
+  {
     throw std::runtime_error("expecting a simple volume");
   }
   return std::dynamic_pointer_cast<SimpleVolumeContext>(self);
 }
 
-inline std::shared_ptr<NeuralVolumeContext> 
-castNeuralVolume(vnrVolume self) 
+inline std::shared_ptr<NeuralVolumeContext>
+castNeuralVolume(vnrVolume self)
 {
-  if (!self->isNetwork()) {
+  if (!self->isNetwork())
+  {
     throw std::runtime_error("expecting a neural volume");
   }
   return std::dynamic_pointer_cast<NeuralVolumeContext>(self);
@@ -142,7 +177,7 @@ castNeuralVolume(vnrVolume self)
 
 // simple volume
 
-vnrVolume vnrCreateSimpleVolume(const void* data, vnr::vec3i dims, std::string type, vnr::range1f range, std::string sampling_mode)
+vnrVolume vnrCreateSimpleVolume(const void *data, vnr::vec3i dims, std::string type, vnr::range1f range, std::string sampling_mode)
 {
   auto ret = std::make_shared<SimpleVolumeContext>();
   ret->dims = dims;
@@ -153,14 +188,16 @@ vnrVolume vnrCreateSimpleVolume(const void* data, vnr::vec3i dims, std::string t
   return ret;
 }
 
-vnrVolume vnrCreateSimpleVolume(const vnrJson& scene, std::string sampling_mode, bool save_loaded_volume)
+vnrVolume vnrCreateSimpleVolume(const vnrJson &scene, std::string sampling_mode, bool save_loaded_volume)
 {
   auto ret = std::make_shared<SimpleVolumeContext>();
   MultiVolume desc;
-  if (scene.is_string()) {
+  if (scene.is_string())
+  {
     create_json_volume(scene.get<std::string>(), desc);
   }
-  else {
+  else
+  {
     create_json_volume_stringify(scene, desc);
   }
   ret->dims = desc.dims;
@@ -185,48 +222,54 @@ int vnrSimpleVolumeGetNumberOfTimeSteps(vnrVolume self)
 
 // neural volume
 
-vnrVolume vnrCreateNeuralVolume(const json& config, vnrVolume groundtruth, bool online_macrocell_construction, size_t batchsize)
+vnrVolume vnrCreateNeuralVolume(const json &config, vnrVolume groundtruth, bool online_macrocell_construction, size_t batchsize)
 {
-  auto& source = castSimpleVolume(groundtruth)->source;
+  auto &source = castSimpleVolume(groundtruth)->source;
   auto ret = std::make_shared<NeuralVolumeContext>(batchsize);
   ret->dims = groundtruth->dims;
   ret->type = groundtruth->type;
   ret->range = groundtruth->range;
-  if (config.is_string()) {
+  if (config.is_string())
+  {
     ret->neural.set_network(ret->dims, config.get<std::string>(), &source, !online_macrocell_construction);
   }
-  else {
+  else
+  {
     ret->neural.set_network_from_json(ret->dims, config, &source, !online_macrocell_construction);
   }
   ret->clipbox = box3f(vec3f(0), vec3f(1));
   return ret;
 }
 
-vnrVolume vnrCreateNeuralVolume(const json& config, vnr::vec3i dims, size_t batchsize)
+vnrVolume vnrCreateNeuralVolume(const json &config, vnr::vec3i dims, size_t batchsize)
 {
   auto ret = std::make_shared<NeuralVolumeContext>(batchsize);
   ret->dims = dims;
   ret->type = vnr::VALUE_TYPE_FLOAT;
   ret->range = range1f(0, 1);
-  if (config.is_string()) {
+  if (config.is_string())
+  {
     ret->neural.set_network(ret->dims, config.get<std::string>(), nullptr, false);
   }
-  else {
+  else
+  {
     ret->neural.set_network_from_json(ret->dims, config, nullptr, false);
   }
   ret->clipbox = box3f(vec3f(0), vec3f(1));
   return ret;
 }
 
-vnrVolume vnrCreateNeuralVolume(const json& params, size_t batchsize)
+vnrVolume vnrCreateNeuralVolume(const json &params, size_t batchsize)
 {
   vec3i dims;
-  if (params.contains("volume")) {
+  if (params.contains("volume"))
+  {
     dims.x = params["volume"]["dims"]["x"].get<int>();
     dims.y = params["volume"]["dims"]["y"].get<int>();
     dims.z = params["volume"]["dims"]["z"].get<int>();
   }
-  else {
+  else
+  {
     throw std::runtime_error("expecting a model config with volume dims tag");
   }
   auto ret = vnrCreateNeuralVolume(params["model"], dims, batchsize);
@@ -246,7 +289,7 @@ void vnrNeuralVolumeDecodeProgressive(vnrVolume self)
   nv->neural.decode_progressive();
 }
 
-void vnrNeuralVolumeDecode(vnrVolume self, float* output)
+void vnrNeuralVolumeDecode(vnrVolume self, float *output)
 {
   auto nv = castNeuralVolume(self);
   nv->neural.decode_volume(output, nv->neural.get_data_dims());
@@ -270,30 +313,34 @@ void vnrNeuralVolumeSerializeParams(vnrVolume self, std::string filename)
   nv->neural.save_params(filename);
 }
 
-void vnrNeuralVolumeSerializeParams(vnrVolume self, vnrJson& params)
+void vnrNeuralVolumeSerializeParams(vnrVolume self, vnrJson &params)
 {
   auto nv = castNeuralVolume(self);
   nv->neural.save_params_to_json(params);
 }
 
-void vnrNeuralVolumeSetModel(vnrVolume self, const vnrJson& config)
+void vnrNeuralVolumeSetModel(vnrVolume self, const vnrJson &config)
 {
   auto nv = castNeuralVolume(self);
-  if (config.is_string()) {
+  if (config.is_string())
+  {
     nv->neural.set_network(config.get<std::string>());
   }
-  else {
+  else
+  {
     nv->neural.set_network_from_json(config);
   }
 }
 
-void vnrNeuralVolumeSetParams(vnrVolume self, const vnr::json& params)
+void vnrNeuralVolumeSetParams(vnrVolume self, const vnr::json &params)
 {
   auto nv = castNeuralVolume(self);
-  if (params.is_string()) {
+  if (params.is_string())
+  {
     nv->neural.load_params(params.get<std::string>());
   }
-  else {
+  else
+  {
     nv->neural.load_params_from_json(params);
   }
 }
@@ -361,15 +408,17 @@ int vnrNeuralVolumeGetNBytesEncoding(vnrVolume self)
 void vnrVolumeSetClippingBox(vnrVolume self, vnr::vec3f lower, vnr::vec3f upper)
 {
   vnr::affine3f transform;
-  if (self->isNetwork()) {
+  if (self->isNetwork())
+  {
     transform = std::dynamic_pointer_cast<NeuralVolumeContext>(self)->neural.get_data_transform();
   }
-  else {
+  else
+  {
     transform = std::dynamic_pointer_cast<SimpleVolumeContext>(self)->source.get_data_transform();
   }
 
-  lower -= vec3f(self->dims)/2;
-  upper -= vec3f(self->dims)/2;
+  lower -= vec3f(self->dims) / 2;
+  upper -= vec3f(self->dims) / 2;
   lower = gdt::xfmPoint(transform.inverse(), lower);
   upper = gdt::xfmPoint(transform.inverse(), upper);
   self->clipbox.lower = lower;
@@ -378,11 +427,13 @@ void vnrVolumeSetClippingBox(vnrVolume self, vnr::vec3f lower, vnr::vec3f upper)
 
 void vnrVolumeSetScaling(vnrVolume self, vnr::vec3f scale)
 {
-  VolumeObject* v = nullptr;
-  if (self->isNetwork()) {
+  VolumeObject *v = nullptr;
+  if (self->isNetwork())
+  {
     v = &(std::dynamic_pointer_cast<NeuralVolumeContext>(self)->neural);
   }
-  else {
+  else
+  {
     v = &(std::dynamic_pointer_cast<SimpleVolumeContext>(self)->source);
   }
   vnr::affine3f transform = vnr::affine3f::scale(scale) * v->get_data_transform();
@@ -391,10 +442,12 @@ void vnrVolumeSetScaling(vnrVolume self, vnr::vec3f scale)
 
 vnr::range1f vnrVolumeGetValueRange(vnrVolume self)
 {
-  if (self->isNetwork()) {
+  if (self->isNetwork())
+  {
     return std::dynamic_pointer_cast<NeuralVolumeContext>(self)->neural.get_data_value_range();
   }
-  else {
+  else
+  {
     return std::dynamic_pointer_cast<SimpleVolumeContext>(self)->source.get_data_value_range();
   }
 }
@@ -408,24 +461,26 @@ vnrTransferFunction vnrCreateTransferFunction()
   return std::make_shared<TransferFunction>();
 }
 
-vnrTransferFunction vnrCreateTransferFunction(const vnr::json& scene)
+vnrTransferFunction vnrCreateTransferFunction(const vnr::json &scene)
 {
   auto tfn = std::make_shared<TransferFunction>();
-  if (scene.is_string()) {
+  if (scene.is_string())
+  {
     create_json_tfn(scene.get<std::string>(), *tfn);
   }
-  else {
+  else
+  {
     create_json_tfn_stringify(scene, *tfn);
   }
   return tfn;
 }
 
-void vnrTransferFunctionSetColor(vnrTransferFunction tfn, const std::vector<vnr::vec3f>& colors)
+void vnrTransferFunctionSetColor(vnrTransferFunction tfn, const std::vector<vnr::vec3f> &colors)
 {
   tfn->color = colors;
 }
 
-void vnrTransferFunctionSetAlpha(vnrTransferFunction tfn, const std::vector<vnr::vec2f>& alphas)
+void vnrTransferFunctionSetAlpha(vnrTransferFunction tfn, const std::vector<vnr::vec2f> &alphas)
 {
   tfn->alpha = alphas;
 }
@@ -435,17 +490,17 @@ void vnrTransferFunctionSetValueRange(vnrTransferFunction tfn, vnr::range1f rang
   tfn->range = range;
 }
 
-const std::vector<vnr::vec3f>& vnrTransferFunctionGetColor(vnrTransferFunction tfn)
+const std::vector<vnr::vec3f> &vnrTransferFunctionGetColor(vnrTransferFunction tfn)
 {
   return tfn->color;
 }
 
-const std::vector<vnr::vec2f>& vnrTransferFunctionGetAlpha(vnrTransferFunction tfn)
+const std::vector<vnr::vec2f> &vnrTransferFunctionGetAlpha(vnrTransferFunction tfn)
 {
   return tfn->alpha;
 }
 
-const vnr::range1f& vnrTransferFunctionGetValueRange(vnrTransferFunction tfn)
+const vnr::range1f &vnrTransferFunctionGetValueRange(vnrTransferFunction tfn)
 {
   return tfn->range;
 }
@@ -461,32 +516,32 @@ vnrRenderer vnrCreateRenderer(vnrVolume v)
   self->framebuffer.create();
   self->framebuffer_stream = self->framebuffer.current_stream();
   self->render.stream = self->framebuffer_stream;
-  if (self->volume->isNetwork()) {
-    auto& source = std::dynamic_pointer_cast<NeuralVolumeContext>(self->volume)->neural;
+  if (self->volume->isNetwork())
+  {
+    auto &source = std::dynamic_pointer_cast<NeuralVolumeContext>(self->volume)->neural;
     self->render.init(
-      source.get_data_transform(),
-      source.get_data_type(), 
-      source.get_data_dims(), 
-      source.get_data_value_range(),
-      source.get_macrocell_dims(), 
-      source.get_macrocell_spacings(), 
-      source.get_macrocell_value_range(), 
-      source.get_macrocell_max_opacity()
-    );
+        source.get_data_transform(),
+        source.get_data_type(),
+        source.get_data_dims(),
+        source.get_data_value_range(),
+        source.get_macrocell_dims(),
+        source.get_macrocell_spacings(),
+        source.get_macrocell_value_range(),
+        source.get_macrocell_max_opacity());
   }
-  else {
-    auto& source = std::dynamic_pointer_cast<SimpleVolumeContext>(self->volume)->source;
+  else
+  {
+    auto &source = std::dynamic_pointer_cast<SimpleVolumeContext>(self->volume)->source;
     // std::cout << "REF MC " <<  source.get_macrocell_value_range() << std::endl;
     self->render.init(
-      source.get_data_transform(),
-      source.get_data_type(), 
-      source.get_data_dims(), 
-      source.get_data_value_range(),
-      source.get_macrocell_dims(), 
-      source.get_macrocell_spacings(), 
-      source.get_macrocell_value_range(), 
-      source.get_macrocell_max_opacity()
-    );
+        source.get_data_transform(),
+        source.get_data_type(),
+        source.get_data_dims(),
+        source.get_data_value_range(),
+        source.get_macrocell_dims(),
+        source.get_macrocell_spacings(),
+        source.get_macrocell_value_range(),
+        source.get_macrocell_max_opacity());
   }
   self->framebuffer_reset = true;
   return self;
@@ -495,13 +550,23 @@ vnrRenderer vnrCreateRenderer(vnrVolume v)
 void vnrRendererSetMode(vnrRenderer self, int mode)
 {
   self->rendering_mode = mode;
-  if (mode < 4) {
+  if (mode < 4)
+  {
     std::string name = "???";
-    switch ((vnrRenderMode)mode) {
-    case VNR_OPTIX_NO_SHADING: name = "VNR_OPTIX_NO_SHADING"; break;
-    case VNR_OPTIX_GRADIENT_SHADING: name = "VNR_OPTIX_GRADIENT_SHADING"; break;
-    case VNR_OPTIX_FULL_SHADOW: name = "VNR_OPTIX_FULL_SHADOW"; break;
-    case VNR_OPTIX_SINGLE_SHADE_HEURISTIC: name = "VNR_OPTIX_SINGLE_SHADE_HEURISTIC"; break;
+    switch ((vnrRenderMode)mode)
+    {
+    case VNR_OPTIX_NO_SHADING:
+      name = "VNR_OPTIX_NO_SHADING";
+      break;
+    case VNR_OPTIX_GRADIENT_SHADING:
+      name = "VNR_OPTIX_GRADIENT_SHADING";
+      break;
+    case VNR_OPTIX_FULL_SHADOW:
+      name = "VNR_OPTIX_FULL_SHADOW";
+      break;
+    case VNR_OPTIX_SINGLE_SHADE_HEURISTIC:
+      name = "VNR_OPTIX_SINGLE_SHADE_HEURISTIC";
+      break;
     }
     std::cerr << "Error: OptiX-based rendering mode (" << mode << ":" << name << ") is deprecated" << std::endl;
   }
@@ -532,14 +597,16 @@ void vnrRendererSetVolumeDensityScale(vnrRenderer self, float value)
 void vnrRendererSetTransferFunction(vnrRenderer self, vnrTransferFunction _tfn)
 {
   range1f original_data_range;
-  auto& tfn = *_tfn;
-  if (self->volume->isNetwork()) {
-    auto& source = std::dynamic_pointer_cast<NeuralVolumeContext>(self->volume)->neural;
+  auto &tfn = *_tfn;
+  if (self->volume->isNetwork())
+  {
+    auto &source = std::dynamic_pointer_cast<NeuralVolumeContext>(self->volume)->neural;
     source.set_transfer_function(tfn.color, tfn.alpha, tfn.range);
     original_data_range = source.get_data_value_range();
   }
-  else {
-    auto& source = std::dynamic_pointer_cast<SimpleVolumeContext>(self->volume)->source;
+  else
+  {
+    auto &source = std::dynamic_pointer_cast<SimpleVolumeContext>(self->volume)->source;
     source.set_transfer_function(tfn.color, tfn.alpha, tfn.range);
     original_data_range = source.get_data_value_range();
   }
@@ -581,34 +648,36 @@ void vnrRendererResetAccumulation(vnrRenderer self)
 
 void vnrRender(vnrRenderer self)
 {
-  if (self->framebuffer_reset) {
+  if (self->framebuffer_reset)
+  {
     self->render.update(
-      self->rendering_mode, 
-      self->tfn.tfn,
-      self->sampling_rate,
-      self->density_scale,
-      self->volume->clipbox.lower,
-      self->volume->clipbox.upper,
-      self->camera,
-      self->framebuffer_size
-    );
+        self->rendering_mode,
+        self->tfn.tfn,
+        self->sampling_rate,
+        self->density_scale,
+        self->volume->clipbox.lower,
+        self->volume->clipbox.upper,
+        self->camera,
+        self->framebuffer_size);
     self->framebuffer_reset = false;
   }
 
-  if (self->framebuffer_size.long_product() == 0) return;
+  if (self->framebuffer_size.long_product() == 0)
+    return;
 
-  if (self->volume->isNetwork()) {
-    auto& source = std::dynamic_pointer_cast<NeuralVolumeContext>(self->volume)->neural;    
+  if (self->volume->isNetwork())
+  {
+    auto &source = std::dynamic_pointer_cast<NeuralVolumeContext>(self->volume)->neural;
     self->render.render(self->framebuffer.device_pointer(), &source, source.texture());
   }
-  else {
-    auto& source = std::dynamic_pointer_cast<SimpleVolumeContext>(self->volume)->source;
+  else
+  {
+    auto &source = std::dynamic_pointer_cast<SimpleVolumeContext>(self->volume)->source;
     self->render.render(self->framebuffer.device_pointer(), nullptr, source.texture());
   }
 
   self->framebuffer.download_async();
 }
-
 
 // ------------------------------------------------------------------
 //
@@ -619,17 +688,23 @@ void vnrResetMaxMemory()
   util::max_nbytes_allocated() = 0;
 }
 
-void vnrMemoryQuery(size_t* used_by_self, size_t* used_by_tcnn, size_t* used_peak, size_t* used_total)
+void vnrMemoryQuery(size_t *used_by_self, size_t *used_by_tcnn, size_t *used_peak, size_t *used_total)
 {
-  if (used_by_self) *used_by_self = util::tot_nbytes_allocated();
-  if (used_by_tcnn) *used_by_tcnn = NeuralVolume::tot_nbytes_allocated_by_tcnn();
-  if (used_peak) *used_peak = util::max_nbytes_allocated() + NeuralVolume::max_nbytes_allocated_by_tcnn();
-  if (used_total) {
-    unsigned long long tmp; util::getUsedGPUMemory(&tmp); *used_total = tmp;
+  if (used_by_self)
+    *used_by_self = util::tot_nbytes_allocated();
+  if (used_by_tcnn)
+    *used_by_tcnn = NeuralVolume::tot_nbytes_allocated_by_tcnn();
+  if (used_peak)
+    *used_peak = util::max_nbytes_allocated() + NeuralVolume::max_nbytes_allocated_by_tcnn();
+  if (used_total)
+  {
+    unsigned long long tmp;
+    util::getUsedGPUMemory(&tmp);
+    *used_total = tmp;
   }
 }
 
-void vnrMemoryQueryPrint(const char* str)
+void vnrMemoryQueryPrint(const char *str)
 {
   size_t used_by_self;
   size_t used_by_tcnn;
@@ -641,8 +716,7 @@ void vnrMemoryQueryPrint(const char* str)
          util::prettyBytes(used_by_self).c_str(),
          util::prettyBytes(used_by_tcnn).c_str(),
          util::prettyBytes(used_total - used_by_self - used_by_tcnn).c_str(),
-         util::prettyBytes(used_peak).c_str()
-  );
+         util::prettyBytes(used_peak).c_str());
 }
 
 void vnrFreeTemporaryGPUMemory()
@@ -650,7 +724,7 @@ void vnrFreeTemporaryGPUMemory()
   NeuralVolume::free_temporary_gpu_memory_by_tcnn();
 }
 
-void vnrCompilationStatus(const char* str)
+void vnrCompilationStatus(const char *str)
 {
   printf("%s: Instant VNR Summary\n", str);
 
