@@ -39,7 +39,7 @@ using namespace vnr::math;
 #include <vidi_logger.h>
 
 using Timer = vidi::details::HighPerformanceTimer;
-using Logger = vidi::CsvLogger;
+// using Logger = vidi::CsvLogger;
 
 const char *render_modes = " 0 Reference (No Shading)\0"
                            " 1 Reference (Local Illumination)\0"
@@ -158,8 +158,8 @@ extern "C" int main(int ac, char **av)
   // Initialize command line arguments.
   // -------------------------------------------------------
   CmdArgs args("Commandline Volume Renderer", ac, av);
-  Logger logger;
-  logger.initialize({"#", "frame time", "fps"}, args.expname());
+  // Logger logger;
+  // logger.initialize({"#", "frame time", "fps"}, args.expname());
 
   vnrVolume volume;
 
@@ -289,13 +289,13 @@ extern "C" int main(int ac, char **av)
   timer1.stop();
   const auto totaltime = timer1.milliseconds() / 1000.0;
 
-  for (int i = 0; i < args.num_frames(); ++i)
-  {
-    logger.log_entry<double>({(double)i, (double)timings[i] / 1000.0, (double)1000.0 / timings[i]});
-  }
+  // for (int i = 0; i < args.num_frames(); ++i)
+  // {
+  //   logger.log_entry<double>({(double)i, (double)timings[i] / 1000.0, (double)1000.0 / timings[i]});
+  // }
 
   const vec4f *pixels = vnrRendererMapFrame(ren);
-  saveJPG(args.expname() + "-screenshot.jpg", vec2i(768, 768), pixels);
+  saveJPG(args.expname() + ".jpg", vec2i(768, 768), pixels);
 
   std::cout << "Summary: " << args.expname() << std::endl;
   std::cout << "\tvolume: " << args.volume() << std::endl;
